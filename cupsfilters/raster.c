@@ -206,7 +206,7 @@ cfRasterPrepareHeader(cups_page_header_t *h,   // I  - Raster header
   int cupsrasterheader = 1;
   const char *p;
   ipp_attribute_t *attr;
-  const char *cspaces_available = NULL, *color_mode = NULL, *quality = NULL;
+  const char *cspaces_available = NULL, *color_mode = NULL, *quality = NULL, *val = NULL;
   int hi_depth;
   char valuebuffer[2048];
   int res = 1;
@@ -339,6 +339,37 @@ cfRasterPrepareHeader(cups_page_header_t *h,   // I  - Raster header
   else
     raster_base_header(h, data, 1 - cupsrasterheader);
   memset(dimensions, 0, sizeof(dimensions));
+
+  if ((val = cupsGetOption("print-content-optimize", num_options,
+			   options)) != NULL ||
+      (val = cupsGetOption("output-type", num_options, options)) != NULL ||
+      (val = cupsGetOption("OutputType", num_options, options)) != NULL ||
+      (val = cfIPPAttrEnumValForPrinter(printer_attrs,
+					job_attrs,
+					"print-content-optimize")) != NULL)
+  {
+    if (!strncasecmp(val, "auto", 4))
+      _strlcpy(h->OutputType, "automatic",
+	      sizeof(h->OutputType));
+    else if (!strcasecmp(val, "graphics") ||
+	     !strcasecmp(val, "graphic"))
+      _strlcpy(h->OutputType, "graphics", sizeof(h->OutputType));
+    else if (!strcasecmp(val, "photo"))
+      _strlcpy(h->OutputType, "photo", sizeof(h->OutputType));
+    else if (!strcasecmp(val, "text"))
+      _strlcpy(h->OutputType, "text", sizeof(h->OutputType));
+    else if (!strcasecmp(val, "text-and-graphics") ||
+	     !strcasecmp(val, "text-and-graphic") ||
+	     !strcasecmp(val, "TextAndGraphics") ||
+	     !strcasecmp(val, "TextAndGraphic"))
+      _strlcpy(h->OutputType, "text-and-graphics",
+	      sizeof(h->OutputType));
+    else if (!pwgraster)
+      _strlcpy(h->OutputType, val, sizeof(h->OutputType));
+  }
+  else
+    _strlcpy(h->OutputType, "automatic", sizeof(h->OutputType));
+
   for (i = 0; i < 4; i ++)
     margins[i] = -1.0;
   i = cfGetPageDimensions(data->printer_attrs, data->job_attrs,
