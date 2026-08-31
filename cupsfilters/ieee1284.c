@@ -794,9 +794,24 @@ cfIEEE1284NormalizeMakeModel(
     //
 
     bufptr = buffer;
-    while (*makeptr != ':') makeptr ++;
+
+    //
+    // Pass through MFG:/MANUFACTURER: and whitespaces
+    //
+
+    while (*makeptr != ':')
+      makeptr ++;
+
     makeptr ++;
-    while (isspace(*makeptr)) makeptr ++;
+
+    while (isspace(*makeptr))
+      makeptr ++;
+
+    //
+    // Copy the MAKE value to buffer until semicolon or
+    // end of string...
+    //
+
     while (*makeptr != ';' && *makeptr != '\0' &&
 	   bufptr < buffer + bufsize - 1)
     {
@@ -804,17 +819,59 @@ cfIEEE1284NormalizeMakeModel(
       makeptr ++;
       bufptr ++;
     }
-    while (isspace(*(bufptr - 1))) bufptr --;
+
+    //
+    // Skip any whitespaces at the end of MAKE value
+    //
+
+    while (bufptr > buffer && isspace(*(bufptr - 1)))
+      bufptr --;
+
+    //
+    // Exit if no MAKE value
+    //
+
+    if ((bufptr - buffer) == 0)
+    {
+      if (buffer)
+        buffer[0] = '\0';
+
+      return (NULL);
+    }
+
+    //
+    // Put separating space if possible
+    //
+
     if (bufptr < buffer + bufsize - 1)
     {
       *bufptr = ' ';
       makeptr ++;
       bufptr ++;
     }
+
+    //
+    // Save start of MDL value in output buffer
+    //
+
     makeptr = bufptr;
-    while (*modelptr != ':') modelptr ++;
+
+    //
+    // Skip MDL:/MODEL: and any starting whitespace
+    //
+
+    while (*modelptr != ':')
+      modelptr ++;
+
     modelptr ++;
-    while (isspace(*modelptr)) modelptr ++;
+
+    while (isspace(*modelptr))
+      modelptr ++;
+
+    //
+    // Save model value to buffer
+    //
+
     while (*modelptr != ';' && *modelptr != '\0' &&
 	   bufptr < buffer + bufsize - 1)
     {
@@ -822,12 +879,38 @@ cfIEEE1284NormalizeMakeModel(
       modelptr ++;
       bufptr ++;
     }
-    while (isspace(*(bufptr - 1))) bufptr --;
-    *bufptr = '\0';
-    if (!nomakemodel && makeptr != bufptr)
-      modelptr = makeptr;
+
+    //
+    // Skip whitespaces at end
+    //
+
+    while (bufptr > makeptr && isspace(*(bufptr - 1)))
+      bufptr --;
+
+    //
+    // Exit if no MODEL value when we need it
+    //
+
+    if (!nomakemodel)
+    {
+      if ((bufptr - makeptr) == 0)
+      {
+        if (buffer)
+          buffer[0] = '\0';
+
+        return (NULL);
+      }
+      else
+        modelptr = makeptr;
+    }
     else
       modelptr = NULL;
+
+    *bufptr = '\0';
+
+    if (!nomakemodel && makeptr != bufptr)
+      modelptr = makeptr;
+
     extraptr = NULL;
     drvptr = NULL;
   }
