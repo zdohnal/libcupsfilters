@@ -107,6 +107,7 @@ typedef struct xform_prepare_s          // Preparation data
   bool 		needAppearances;	// does PDF need appearances?
   char          **annotation_contents; // Annotation contents to write to page streams
   size_t        num_annotations;       // Number of annotations to write
+  pdfio_obj_t   *label_font;          // Helvetica font for page label
 } xform_prepare_t;
 
 #endif // !_CUPS_FILTERS_PDFTOPDF_PDFTOPDF_H

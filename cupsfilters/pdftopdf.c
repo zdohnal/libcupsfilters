@@ -2320,6 +2320,81 @@ copy_page(xform_prepare_t *p,		// I - Preparation data
 
 
 //
+// 'render_page_label()' - Render a page label at the top and bottom of
+//                         a page.
+//
+// Draws a white filled rectangle with a black outline and black text at
+// both the top and bottom of the page, matching the behavior of the old
+// qpdf-based page-label implementation.
+//
+
+static void
+render_page_label(xform_prepare_t *p,     // I - Preparation data
+                  pdfio_stream_t  *st)   // I - Output page stream
+{
+  double margin = 2.25;                   // Margin around label box
+  double height = 12.0;                   // Text height
+  double box_h  = height + 2.0 * margin;  // Box height
+  double left   = p->media.x1;           // Page left
+  double right  = p->media.x2;           // Page right
+  double top    = p->media.y2;           // Page top
+  double bottom = p->media.y1;           // Page bottom
+  double box_w  = right - left - 2.0 * margin;
+                                          // Box width
+  double text_w = pdfioContentTextMeasure(p->label_font,
+                                           p->options->page_label, 12.0);
+                                          // Label text width
+  double text_x = left + margin + (box_w - text_w) / 2.0;
+                                          // Centered text X position
+
+  pdfioContentSave(st);
+
+  // White filled rectangles
+  pdfioContentSetFillColorDeviceGray(st, 1.0);
+  pdfioContentPathRect(st, left + margin,
+                        top - height - 2.0 * margin,
+                        box_w, box_h);
+  pdfioContentFill(st, false);
+
+  pdfioContentPathRect(st, left + margin,
+                        bottom + height + margin,
+                        box_w, box_h);
+  pdfioContentFill(st, false);
+
+  // Black outlines
+  pdfioContentSetStrokeColorDeviceGray(st, 0.0);
+  pdfioContentSetLineWidth(st, 1.0);
+  pdfioContentPathRect(st, left + margin,
+                        top - height - 2.0 * margin,
+                        box_w, box_h);
+  pdfioContentStroke(st);
+
+  pdfioContentPathRect(st, left + margin,
+                        bottom + height + margin,
+                        box_w, box_h);
+  pdfioContentStroke(st);
+
+  // Black text at top (centered)
+  pdfioContentSetFillColorDeviceGray(st, 0.0);
+  pdfioContentTextBegin(st);
+  pdfioContentSetTextFont(st, "CF_PLF", 12.0);
+  pdfioContentTextMoveTo(st, text_x, top - height - margin);
+  pdfioContentTextShow(st, false, p->options->page_label);
+  pdfioContentTextEnd(st);
+
+  // Black text at bottom (centered)
+  pdfioContentTextBegin(st);
+  pdfioContentSetTextFont(st, "CF_PLF", 12.0);
+  pdfioContentTextMoveTo(st, text_x,
+                          bottom + height + 2.0 * margin);
+  pdfioContentTextShow(st, false, p->options->page_label);
+  pdfioContentTextEnd(st);
+
+  pdfioContentRestore(st);
+}
+
+
+//
 // 'prepare_documents()' - Prepare one or more documents for printing.
 //
 // This function generates a single PDF file containing the union of the input
@@ -2404,6 +2479,10 @@ prepare_documents(
 
   if ((p.pdf = pdfioFileCreateTemporary(outfile, outsize, "1.7", &p.media, &p.media, pdfio_error_cb, &p)) == NULL)
     return (false);
+
+  // Create page-label font if needed
+  if (options->page_label[0])
+    p.label_font = pdfioFileCreateFontObjFromBase(p.pdf, "Helvetica");
 
   // Loop through the input documents to count pages, etc.
   for (i = num_documents, d = documents, document = 1, page = 1; i > 0; i --, d ++, document ++)
@@ -2609,8 +2688,9 @@ prepare_documents(
 	!strcmp(options->page_border, "none") && 
 	!options->mirror && 
 	options->orientation_requested == CF_FILTER_ORIENT_NONE &&
-        !p.has_form &&
-  	!p.has_annotations)
+	!p.has_form &&
+	!p.has_annotations &&
+	!options->page_label[0])
     {
       // Simple path - no layout/scaling/rotation of pages so we can just copy the pages quickly.
       if (Verbosity)
@@ -2643,6 +2723,9 @@ prepare_documents(
 	pdfioDictSetDict(outpage->pagedict, "Resources", outpage->resdict);
 	pdfioDictSetName(outpage->pagedict, "Type", "Page");
 
+	if (p.label_font)
+	  pdfioPageDictAddFont(outpage->pagedict, "CF_PLF", p.label_font);
+
 	for (layout = 0; layout < p.num_layout; layout ++)
 	{
 	  pdfio_dict_t	*pagedict,	// Page dictionary
@@ -2674,6 +2757,9 @@ prepare_documents(
 	{
 	  copy_page(&p, outpage, layout);
 	}
+
+	if (p.label_font)
+	  render_page_label(&p, outpage->output);
 
 	pdfio_end_page(&p, outpage->output);
 	outpage->output = NULL;
